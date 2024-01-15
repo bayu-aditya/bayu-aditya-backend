@@ -1,0 +1,6 @@
+project:
+  environment: string
+nats:
+  url: x.x.x.x:port
+  username: string
+  password: string
