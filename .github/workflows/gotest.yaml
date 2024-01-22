@@ -1,0 +1,43 @@
+name: Go Test and Try Build Docker
+
+on:
+  push:
+    branches:
+      - '**'
+      - '!main'
+
+jobs:
+  golang-test:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Setup Golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.20'
+
+      - name: Go Test
+        env:
+          MODE: development
+        run: go test -count=1 -v ./...
+
+      - name: Try Build Binary
+        run: |
+          go build -o ./rest.out ./cmd/rest/*
+
+  build-docker:
+    runs-on: ubuntu-20.04
+    needs:
+      - golang-test
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: "Build Docker Image"
+        run: DOCKER_BUILDKIT=1 docker build -t test_image .
+
+      - name: "Clean Up"
+        run: |
+          docker rmi test_image
+          docker image prune -f
