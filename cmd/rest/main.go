@@ -3,21 +3,19 @@ package main
 import (
 	"errors"
 	"github.com/bayu-aditya/bayu-aditya-backend/lib/core/util"
-	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"net/http"
 )
 
 func main() {
-	r := gin.Default()
+	router, stopRouter := initializeRouter()
+
 	server := &http.Server{
 		Addr:    ":8080",
-		Handler: r,
+		Handler: router,
 	}
 
-	stopRouter := initializeRouter(r)
-
-	waitFinishChan := util.GracefulShutdown(func() {
+	finishChan := util.GracefulShutdown(func() {
 		shutdownHttp(server)
 		stopRouter()
 	})
@@ -26,6 +24,6 @@ func main() {
 		logrus.Fatalf("Run Server: %v", err)
 	}
 
-	<-waitFinishChan
+	<-finishChan
 	logrus.Info("Shutdown application")
 }
