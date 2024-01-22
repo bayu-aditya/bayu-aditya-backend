@@ -9,8 +9,30 @@ env:
   DOCKER_IMAGE_NAME: ghcr.io/bayu-aditya/bayu-aditya-backend
 
 jobs:
-  build-push:
+  golang-test:
     runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Setup Golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.20'
+
+      - name: Go Test
+        env:
+          MODE: development
+        run: go test -count=1 -v ./...
+
+      - name: Try Build Binary
+        run: |
+          go build -o ./rest.out ./cmd/rest/*
+
+  docker-build-push:
+    runs-on: ubuntu-20.04
+    needs:
+      - golang-test
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -26,6 +48,11 @@ jobs:
       - name: Push Docker Image
         run: docker push $DOCKER_IMAGE_NAME:${GITHUB_SHA:0:4}
 
+  kubernetes-update-deployment:
+    runs-on: ubuntu-20.04
+    needs:
+      - docker-build-push
+    steps:
       - name: Kubernetes Deployment
         uses: actions-hub/kubectl@master
         env:

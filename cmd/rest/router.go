@@ -9,8 +9,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func initializeRouter(r *gin.Engine) (stop func()) {
-	cfg, err := config.New("./files/config.yaml")
+func initializeRouter() (r *gin.Engine, stop func()) {
+	// initialize router
+	r = gin.New()
+	r.Use(gin.Recovery())
+
+	if gin.Mode() != gin.ReleaseMode {
+		r.Use(gin.Logger())
+	}
+
+	// initialize config
+	cfg, err := config.New("./files/config/config.yaml")
 	if err != nil {
 		logrus.Fatalf("init config: %v", err)
 	}
