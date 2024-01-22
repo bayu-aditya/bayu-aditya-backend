@@ -19,7 +19,8 @@ func (r *repository) MonopolySetState(ctx context.Context, roomID string, state 
 	}
 
 	kvEntry, err := r.kv.Get(ctx, roomID)
-	if err != nil && err.Error() != nats.ErrKeyNotFound.Error() { // TODO error handling if key is not exist
+
+	if err != nil && !errors.As(err, &nats.ErrKeyNotFound) {
 		return util.ErrWrap(prefix, err, "getting key")
 	}
 
@@ -45,7 +46,7 @@ func (r *repository) MonopolyGetState(ctx context.Context, roomID string) (state
 
 	kvEntry, err := r.kv.Get(ctx, roomID)
 	if err != nil {
-		if errors.Is(err, nats.ErrKeyNotFound) {
+		if errors.As(err, &nats.ErrKeyNotFound) {
 			err = constant.ErrRoomNotFound
 			return
 		}

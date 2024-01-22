@@ -9,6 +9,10 @@ var (
 	Version1 = "v1"
 )
 
+type ILog interface {
+	ToStateLog() StateLog
+}
+
 type (
 	State struct {
 		Version        string        `json:"version"`
@@ -36,4 +40,8 @@ func (s *State) Encode() ([]byte, error) {
 
 func (s *State) Decode(data []byte) error {
 	return msgpack.Unmarshal(data, s)
+}
+
+func (s *State) AppendLog(log ILog) {
+	s.Logs = append(s.Logs, log.ToStateLog())
 }

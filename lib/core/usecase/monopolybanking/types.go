@@ -11,6 +11,7 @@ type IMonopolyBankingUsecase interface {
 	JoinRoom(ctx context.Context, playerID, playerName, roomID, roomPass string) error
 	LeaveRoom(ctx context.Context, playerID, roomID string) error
 	GetState(ctx context.Context, playerID, roomID string) (modelmonopoly.State, error)
+	CreateTransaction(ctx context.Context, roomID, playerID, targetPlayerID string, amount int64, mode string) error
 	SubscribeState(ctx context.Context, roomID string) (stateChan <-chan modelmonopoly.State, stop func(), err error)
 }
 

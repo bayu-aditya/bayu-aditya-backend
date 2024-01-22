@@ -11,7 +11,7 @@ import (
 
 func NewNatsRepository(cfg *config.Config) (INatsRepository, error) {
 	prefix := "reponats"
-	bucketName := fmt.Sprintf("ba-%s-mbs", cfg.Project.Environment)
+	bucketName := fmt.Sprintf("ba-mbs-%s", cfg.Project.Environment)
 
 	natsConn, err := nats.Connect(fmt.Sprintf("%s:%s@%s", cfg.Nats.Username, cfg.Nats.Password, cfg.Nats.Url))
 	if err != nil {

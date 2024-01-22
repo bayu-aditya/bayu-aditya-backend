@@ -6,6 +6,7 @@ import (
 	"github.com/bayu-aditya/bayu-aditya-backend/lib/core/model/constant"
 	modelmonopoly "github.com/bayu-aditya/bayu-aditya-backend/lib/core/model/monopoly"
 	"github.com/bayu-aditya/bayu-aditya-backend/lib/core/util"
+	"sort"
 )
 
 func (u *usecase) CreateRoom(ctx context.Context, player modelmonopoly.StatePlayer, initialBalance int64) (roomID string, roomPass string, err error) {
@@ -26,6 +27,7 @@ func (u *usecase) CreateRoom(ctx context.Context, player modelmonopoly.StatePlay
 		InitialBalance: initialBalance,
 		Players:        []modelmonopoly.StatePlayer{player},
 	}
+	state.AppendLog(logJoinRoom{playerName: player.Name})
 
 	if err = u.repositoryNats.MonopolySetState(ctx, roomID, state); err != nil {
 		err = util.ErrWrap(prefix, err, "set state")
@@ -59,7 +61,7 @@ func (u *usecase) JoinRoom(ctx context.Context, playerID, playerName, roomID, ro
 	})
 
 	// insert log
-	state.Logs = append(state.Logs, logJoinRoom{playerName: playerName}.ToStateLog())
+	state.AppendLog(logJoinRoom{playerName: playerName})
 
 	// update to database
 	if err = u.repositoryNats.MonopolySetState(ctx, roomID, state); err != nil {
@@ -83,7 +85,7 @@ func (u *usecase) LeaveRoom(ctx context.Context, playerID, roomID string) error 
 	// insert log
 	for _, player := range state.Players {
 		if player.ID == playerID {
-			state.Logs = append(state.Logs, logLeaveRoom{playerName: player.Name}.ToStateLog())
+			state.AppendLog(logLeaveRoom{playerName: player.Name})
 			break
 		}
 	}
@@ -93,6 +95,10 @@ func (u *usecase) LeaveRoom(ctx context.Context, playerID, roomID string) error 
 		if player.ID == playerID {
 			state.Players = append(state.Players[:i], state.Players[i+1:]...)
 		}
+	}
+
+	if err = u.repositoryNats.MonopolySetState(ctx, roomID, state); err != nil {
+		return util.ErrWrap(prefix, err, "set state")
 	}
 
 	return nil
@@ -110,7 +116,64 @@ func (u *usecase) GetState(ctx context.Context, playerID, roomID string) (state 
 		return
 	}
 
+	// sort logs by datetime
+	sort.SliceStable(state.Logs, func(i, j int) bool {
+		return state.Logs[i].Datetime.Unix() > state.Logs[j].Datetime.Unix()
+	})
+
 	return
+}
+
+// CreateTransaction
+//   - mode: 'pay' or 'ask'
+func (u *usecase) CreateTransaction(ctx context.Context, roomID, playerID, targetPlayerID string, amount int64, mode string) error {
+	prefix := u.prefix + ".CreateTransaction"
+
+	state, err := u.repositoryNats.MonopolyGetState(ctx, roomID)
+	if err != nil {
+		return util.ErrWrap(prefix, err, "get state")
+	}
+
+	// create transaction
+	sourceName := ""
+	targetName := ""
+
+	for i, player := range state.Players {
+		// for source player
+		if player.ID == playerID {
+			sourceName = player.Name
+
+			if mode == "pay" {
+				state.Players[i].Balance -= amount
+			} else {
+				state.Players[i].Balance += amount
+			}
+		}
+
+		// for target player
+		if player.ID == targetPlayerID {
+			targetName = player.Name
+
+			if mode == "ask" {
+				state.Players[i].Balance -= amount
+			} else {
+				state.Players[i].Balance += amount
+			}
+		}
+	}
+
+	state.AppendLog(logTransaction{
+		sourceName: sourceName,
+		targetName: targetName,
+		mode:       mode,
+		amount:     amount,
+	})
+
+	if err = u.repositoryNats.MonopolySetState(ctx, roomID, state); err != nil {
+		return util.ErrWrap(prefix, err, "set state")
+	}
+
+	return nil
 }
 
 func (u *usecase) SubscribeState(ctx context.Context, roomID string) (stateChan <-chan modelmonopoly.State, stop func(), err error) {

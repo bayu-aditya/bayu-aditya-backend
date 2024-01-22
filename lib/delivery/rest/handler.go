@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	modelmonopoly "github.com/bayu-aditya/bayu-aditya-backend/lib/core/model/monopoly"
+	"github.com/bayu-aditya/bayu-aditya-backend/lib/core/util"
 	"github.com/gin-gonic/gin"
 	"io"
 	"time"
@@ -81,20 +82,78 @@ func (h *Handler) MonopolyJoinRoom(c *gin.Context) {
 	responseOK(c, nil)
 }
 
-type monopolyServerSentEventRequestQuery struct {
-	RoomID string `form:"room_id" binding:"required"`
+type monopolyGetStateRequestQuery struct {
+	PlayerID string `form:"player_id" binding:"required"`
 }
 
-func (h *Handler) MonopolyServerSentEvent(c *gin.Context) {
-	requestQuery := monopolyServerSentEventRequestQuery{}
-	timeoutChan := time.After(60 * time.Second)
+type monopolyGetStateResponseJson struct {
+	Player  modelmonopoly.StatePlayer   `json:"player"`
+	Players []modelmonopoly.StatePlayer `json:"players"`
+	Logs    []modelmonopoly.StateLog    `json:"logs"`
+}
+
+func (h *Handler) MonopolyGetState(c *gin.Context) {
+	requestQuery := monopolyGetStateRequestQuery{}
+	responseJson := monopolyGetStateResponseJson{}
+	roomID := c.Param("room_id")
 
 	if err := c.BindQuery(&requestQuery); err != nil {
 		responseBadRequest(c, err.Error())
 		return
 	}
 
-	roomID := requestQuery.RoomID
+	state, err := h.usecaseMonopolyBanking.GetState(c, requestQuery.PlayerID, roomID)
+	if err != nil {
+		responseInternalServer(c, err.Error())
+		return
+	}
+
+	for i, player := range state.Players {
+		if player.ID == requestQuery.PlayerID {
+			responseJson.Player = player
+			state.Players = util.ArrayRemove(state.Players, i)
+		}
+	}
+
+	responseJson.Players = state.Players
+	responseJson.Logs = state.Logs
+
+	responseOK(c, responseJson)
+}
+
+type monopolyCreateTransactionRequestJson struct {
+	PlayerID       string `json:"player_id"`
+	TargetPlayerID string `json:"target_player_id"`
+	Type           string `json:"type"`
+	Amount         int64  `json:"amount"`
+}
+
+func (h *Handler) MonopolyCreateTransaction(c *gin.Context) {
+	requestJson := monopolyCreateTransactionRequestJson{}
+
+	if err := c.BindJSON(&requestJson); err != nil {
+		responseBadRequest(c, err.Error())
+		return
+	}
+
+	roomID := c.Param("room_id")
+	playerID := requestJson.PlayerID
+	targetPlayerID := requestJson.TargetPlayerID
+	amount := requestJson.Amount
+	mode := requestJson.Type
+
+	if err := h.usecaseMonopolyBanking.CreateTransaction(c, roomID, playerID, targetPlayerID, amount, mode); err != nil {
+		responseInternalServer(c, err.Error())
+		return
+	}
+
+	responseOK(c, nil)
+}
+
+func (h *Handler) MonopolyServerSentEvent(c *gin.Context) {
+	timeoutChan := time.After(60 * time.Second)
+
+	roomID := c.Param("room_id")
 
 	stateChan, stop, err := h.usecaseMonopolyBanking.SubscribeState(c, roomID)
 	if err != nil {
@@ -110,7 +169,7 @@ func (h *Handler) MonopolyServerSentEvent(c *gin.Context) {
 				return false
 			}
 
-			c.SSEvent("state", stateJson)
+			c.SSEvent("message", stateJson)
 			return true
 
 		case <-timeoutChan:
