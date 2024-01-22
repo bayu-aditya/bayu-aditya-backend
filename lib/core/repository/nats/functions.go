@@ -6,7 +6,7 @@ import (
 	"github.com/bayu-aditya/bayu-aditya-backend/lib/core/model/constant"
 	modelmonopoly "github.com/bayu-aditya/bayu-aditya-backend/lib/core/model/monopoly"
 	"github.com/bayu-aditya/bayu-aditya-backend/lib/core/util"
-	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,7 +20,7 @@ func (r *repository) MonopolySetState(ctx context.Context, roomID string, state 
 
 	kvEntry, err := r.kv.Get(ctx, roomID)
 
-	if err != nil && !errors.As(err, &nats.ErrKeyNotFound) {
+	if err != nil && !errors.Is(err, jetstream.ErrKeyNotFound) {
 		return util.ErrWrap(prefix, err, "getting key")
 	}
 
@@ -46,7 +46,7 @@ func (r *repository) MonopolyGetState(ctx context.Context, roomID string) (state
 
 	kvEntry, err := r.kv.Get(ctx, roomID)
 	if err != nil {
-		if errors.As(err, &nats.ErrKeyNotFound) {
+		if errors.Is(err, jetstream.ErrKeyNotFound) {
 			err = constant.ErrRoomNotFound
 			return
 		}
