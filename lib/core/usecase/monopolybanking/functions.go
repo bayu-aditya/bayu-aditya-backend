@@ -6,7 +6,6 @@ import (
 	"github.com/bayu-aditya/bayu-aditya-backend/lib/core/model/constant"
 	modelmonopoly "github.com/bayu-aditya/bayu-aditya-backend/lib/core/model/monopoly"
 	"github.com/bayu-aditya/bayu-aditya-backend/lib/core/util"
-	"sort"
 )
 
 func (u *usecase) CreateRoom(ctx context.Context, player modelmonopoly.StatePlayer, initialBalance int64) (roomID string, roomPass string, err error) {
@@ -53,12 +52,27 @@ func (u *usecase) JoinRoom(ctx context.Context, playerID, playerName, roomID, ro
 		return constant.ErrUnauthenticated
 	}
 
-	// insert player
-	state.Players = append(state.Players, modelmonopoly.StatePlayer{
-		ID:      playerID,
-		Name:    playerName,
-		Balance: state.InitialBalance,
-	})
+	// if player exist, update the name.
+	// else, insert new player
+	isPlayerExist := false
+
+	// update the name if player exist
+	for i, player := range state.Players {
+		if player.ID == playerID {
+			state.Players[i].Name = playerName
+			isPlayerExist = true
+			break
+		}
+	}
+
+	// insert player if player not exist
+	if !isPlayerExist {
+		state.Players = append(state.Players, modelmonopoly.StatePlayer{
+			ID:      playerID,
+			Name:    playerName,
+			Balance: state.InitialBalance,
+		})
+	}
 
 	// insert log
 	state.AppendLog(logJoinRoom{playerName: playerName})
@@ -71,7 +85,7 @@ func (u *usecase) JoinRoom(ctx context.Context, playerID, playerName, roomID, ro
 	return nil
 }
 
-func (u *usecase) LeaveRoom(ctx context.Context, playerID, roomID string) error {
+func (u *usecase) LeaveRoom(ctx context.Context, playerID, roomID, roomPass string) error {
 	prefix := u.prefix + ".LeaveRoom"
 
 	state, err := u.repositoryNats.MonopolyGetState(ctx, roomID)
@@ -80,6 +94,11 @@ func (u *usecase) LeaveRoom(ctx context.Context, playerID, roomID string) error 
 			return err
 		}
 		return util.ErrWrap(prefix, err, "get state")
+	}
+
+	// check if pass correct
+	if state.Pass != roomPass {
+		return constant.ErrUnauthenticated
 	}
 
 	// insert log
@@ -115,11 +134,6 @@ func (u *usecase) GetState(ctx context.Context, playerID, roomID string) (state 
 		err = util.ErrWrap(prefix, err, "get state")
 		return
 	}
-
-	// sort logs by datetime
-	sort.SliceStable(state.Logs, func(i, j int) bool {
-		return state.Logs[i].Datetime.Unix() > state.Logs[j].Datetime.Unix()
-	})
 
 	return
 }

@@ -41,6 +41,7 @@ func initializeRouter() (r *gin.Engine, stop func()) {
 	r.GET("/", handler.HealthCheck)
 	r.POST("/mbs/room-join", handler.MonopolyJoinRoom)
 	r.POST("/mbs/room", handler.MonopolyCreateRoom)
+	r.POST("/mbs/room/:room_id/leave", handler.MonopolyLeaveRoom)
 	r.GET("/mbs/room/:room_id/state", handler.MonopolyGetState)
 	r.POST("/mbs/room/:room_id/transaction", handler.MonopolyCreateTransaction)
 	r.GET("/mbs/room/:room_id/sse", handler.MonopolyServerSentEvent)

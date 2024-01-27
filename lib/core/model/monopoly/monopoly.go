@@ -1,6 +1,7 @@
 package modelmonopoly
 
 import (
+	"github.com/bayu-aditya/bayu-aditya-backend/lib/core/util"
 	"github.com/vmihailenco/msgpack/v5"
 	"time"
 )
@@ -43,5 +44,5 @@ func (s *State) Decode(data []byte) error {
 }
 
 func (s *State) AppendLog(log ILog) {
-	s.Logs = append(s.Logs, log.ToStateLog())
+	s.Logs = util.ArrayAppendHead(s.Logs, log.ToStateLog())
 }

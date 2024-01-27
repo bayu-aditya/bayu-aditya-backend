@@ -82,6 +82,31 @@ func (h *Handler) MonopolyJoinRoom(c *gin.Context) {
 	responseOK(c, nil)
 }
 
+type monopolyLeaveRoomRequestJson struct {
+	RoomPass string `json:"room_pass"`
+	PlayerID string `json:"player_id"`
+}
+
+func (h *Handler) MonopolyLeaveRoom(c *gin.Context) {
+	requestJson := monopolyLeaveRoomRequestJson{}
+	roomID := c.Param("room_id")
+
+	if err := c.BindJSON(&requestJson); err != nil {
+		responseBadRequest(c, err.Error())
+		return
+	}
+
+	playerID := requestJson.PlayerID
+	roomPass := requestJson.RoomPass
+
+	if err := h.usecaseMonopolyBanking.LeaveRoom(c, playerID, roomID, roomPass); err != nil {
+		responseInternalServer(c, err.Error())
+		return
+	}
+
+	responseOK(c, nil)
+}
+
 type monopolyGetStateRequestQuery struct {
 	PlayerID string `form:"player_id" binding:"required"`
 }
